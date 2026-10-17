@@ -1,8 +1,12 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from main import process_day
+from main import process_day, init_db
 
 app = FastAPI()
+
+@app.on_event("startup")
+def startup_event():
+    init_db()
 
 class DayInput(BaseModel):
     user_name: str

@@ -10,6 +10,35 @@ load_dotenv()
 client = Anthropic()
 
 DB_PATH = "load_tracker.db"
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        training_summary TEXT,
+        feel_text TEXT,
+        food_text TEXT,
+        parsed_json TEXT,
+        recommended_load TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+    """)
+
+    conn.commit()
+    conn.close()
 
 def get_or_create_user(cur, name):
     cur.execute("SELECT id FROM users WHERE name = ?", (name,))
@@ -49,19 +78,7 @@ Return ONLY valid JSON, no markdown formatting, no explanation, with exactly the
         if raw.startswith("json"):
             raw = raw[4:].strip()
 
-    try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError:
-        print("Could not parse Claude's response as JSON:")
-        print(raw)
-        raise
-
-    required_keys = {"soreness", "fatigue", "sleep_quality", "nutrition_quality", "recommended_load"}
-    missing = required_keys - parsed.keys()
-    if missing:
-        raise ValueError(f"Claude's response was missing expected fields: {missing}")
-
-    return parsed  
+    
 
 def process_day(user_name, training_summary, feel_text, food_text):
     """Core logic: log and process one day, regardless of where the input came from."""
