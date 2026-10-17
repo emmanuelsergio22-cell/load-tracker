@@ -78,8 +78,6 @@ Return ONLY valid JSON, no markdown formatting, no explanation, with exactly the
         if raw.startswith("json"):
             raw = raw[4:].strip()
 
-    
-
 def process_day(user_name, training_summary, feel_text, food_text):
     """Core logic: log and process one day, regardless of where the input came from."""
     conn = sqlite3.connect(DB_PATH)
@@ -89,8 +87,12 @@ def process_day(user_name, training_summary, feel_text, food_text):
 
     combined_text = f"Training: {training_summary}. Feel: {feel_text}. Food: {food_text}."
 
-    similar = find_similar_days(str(user_id), combined_text, n_results=3)
-    past_docs = similar["documents"][0] if similar["documents"] else []
+    try:
+        similar = find_similar_days(str(user_id), combined_text, n_results=3)
+    except Exception:
+        similar = None
+
+    past_docs = similar["documents"][0] if similar and similar.get("documents") else []
     past_days_context = "\n".join(past_docs) if past_docs else "No past days logged yet."
 
     parsed = parse_day(training_summary, feel_text, food_text, past_days_context)
@@ -106,7 +108,9 @@ def process_day(user_name, training_summary, feel_text, food_text):
 
     store_day(log_id, str(user_id), date.today().isoformat(), combined_text)
 
-    return parsed
+    return parsed    
+
+
 
 def main():
     print("Log today's session:")
