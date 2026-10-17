@@ -50,22 +50,25 @@ Return ONLY valid JSON, no markdown formatting, no explanation, with exactly the
             raw = raw[4:].strip()
 
     try:
-        return json.loads(raw)
+        parsed = json.loads(raw)
     except json.JSONDecodeError:
         print("Could not parse Claude's response as JSON:")
         print(raw)
         raise
 
-def main():
+    required_keys = {"soreness", "fatigue", "sleep_quality", "nutrition_quality", "recommended_load"}
+    missing = required_keys - parsed.keys()
+    if missing:
+        raise ValueError(f"Claude's response was missing expected fields: {missing}")
+
+    return parsed  
+
+def process_day(user_name, training_summary, feel_text, food_text):
+    """Core logic: log and process one day, regardless of where the input came from."""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
-    user_id = get_or_create_user(cur, "sergio")
-
-    print("Log today's session:")
-    training_summary = input("Training done: ")
-    feel_text = input("How your body feels: ")
-    food_text = input("What you ate today: ")
+    user_id = get_or_create_user(cur, user_name)
 
     combined_text = f"Training: {training_summary}. Feel: {feel_text}. Food: {food_text}."
 
@@ -74,8 +77,6 @@ def main():
     past_days_context = "\n".join(past_docs) if past_docs else "No past days logged yet."
 
     parsed = parse_day(training_summary, feel_text, food_text, past_days_context)
-    print("Claude's read on today:", parsed)
-    print("Recommended load:", parsed["recommended_load"])
 
     cur.execute("""
         INSERT INTO logs (user_id, date, training_summary, feel_text, food_text, parsed_json, recommended_load)
@@ -88,6 +89,18 @@ def main():
 
     store_day(log_id, str(user_id), date.today().isoformat(), combined_text)
 
+    return parsed
+
+def main():
+    print("Log today's session:")
+    training_summary = input("Training done: ")
+    feel_text = input("How your body feels: ")
+    food_text = input("What you ate today: ")
+
+    parsed = process_day("sergio", training_summary, feel_text, food_text)
+
+    print("Claude's read on today:", parsed)
+    print("Recommended load:", parsed["recommended_load"])
     print("Logged.")
 
 if __name__ == "__main__":
