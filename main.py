@@ -78,6 +78,20 @@ Return ONLY valid JSON, no markdown formatting, no explanation, with exactly the
         if raw.startswith("json"):
             raw = raw[4:].strip()
 
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        print("Could not parse Claude's response as JSON:")
+        print(raw)
+        raise
+
+    required_keys = {"soreness", "fatigue", "sleep_quality", "nutrition_quality", "recommended_load"}
+    missing = required_keys - parsed.keys()
+    if missing:
+        raise ValueError(f"Claude's response was missing expected fields: {missing}")
+
+    return parsed
+
 def process_day(user_name, training_summary, feel_text, food_text):
     """Core logic: log and process one day, regardless of where the input came from."""
     conn = sqlite3.connect(DB_PATH)
